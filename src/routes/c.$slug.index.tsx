@@ -731,6 +731,7 @@ function CartDrawer({
   const [receipt, setReceipt] = useState<{
     orderNumber: string; total: number; currency: string | null; message: string;
     requiresPayment: boolean; paymentMethod: string | null;
+    paymentDetails: string | null; amountDue: number | null;
     lines: Array<{ name: string; color: string | null; size: string | null; quantity: number; price: number | null; currency: string | null }>;
     shippingLabel: string | null; shippingPrice: number; subtotal: number;
     discount: number; offers: StorefrontAppliedOffer[];
@@ -812,6 +813,8 @@ function CartDrawer({
         message: res.confirmationMessage,
         requiresPayment: res.requiresPayment,
         paymentMethod: res.paymentMethod,
+        paymentDetails: res.paymentDetails ?? null,
+        amountDue: res.amountDue ?? null,
         lines: cart.lines.map((l) => ({
           name: l.name, color: l.color ?? null, size: l.size ?? null,
           quantity: l.quantity, price: l.price, currency: l.currency,
@@ -918,6 +921,30 @@ function CartDrawer({
                     لن يُعتبر الأوردر مدفوعاً قبل تأكيد الدفع
                     {receipt.paymentMethod ? ` عبر ${receipt.paymentMethod}` : ""}.
                   </p>
+                  {(receipt.amountDue != null || receipt.paymentDetails) && (
+                    <div className="space-y-2 rounded-lg border p-3">
+                      {receipt.amountDue != null && (
+                        <div className="flex justify-between font-semibold">
+                          <span>المبلغ المطلوب الآن</span>
+                          <span>{receipt.amountDue.toFixed(2)} {receipt.currency ?? ""}</span>
+                        </div>
+                      )}
+                      {receipt.paymentDetails && (
+                        <div>
+                          <div className="text-xs text-muted-foreground">بيانات الدفع</div>
+                          <p className="mt-1 whitespace-pre-wrap break-words font-medium" dir="auto">
+                            {receipt.paymentDetails.split(/(https?:\/\/\S+)/g).map((part, i) =>
+                              /^https?:\/\//.test(part) ? (
+                                <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-primary underline">{part}</a>
+                              ) : (
+                                <span key={i}>{part}</span>
+                              ),
+                            )}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <a
                     href={`/chat/${slug}`}
                     className="flex h-11 w-full items-center justify-center gap-2 rounded-md bg-primary font-semibold text-primary-foreground"

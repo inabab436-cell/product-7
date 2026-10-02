@@ -259,6 +259,10 @@ export type StorefrontOrderResult =
       total: number;
       currency: string | null;
       paymentMethod: string | null;
+      /** Payment details (number / link) the merchant saved for an online method. */
+      paymentDetails: string | null;
+      /** Amount the customer must pay now for an online method. */
+      amountDue: number | null;
       confirmationMessage: string;
       /** true when the chosen method is manual → payment still pending. */
       requiresPayment: boolean;
@@ -714,6 +718,19 @@ export const createStorefrontOrder = createServerFn({ method: "POST" })
       total: totals.total,
       currency: totals.currency,
       paymentMethod: chosenMethod?.name ?? null,
+      paymentDetails:
+        chosenMethod && chosenMethod.payment_kind !== "on_delivery" && chosenMethod.detail_value
+          ? chosenMethod.detail_value
+          : null,
+      amountDue: (() => {
+        if (!chosenMethod || chosenMethod.payment_kind === "on_delivery") return null;
+        const t = Number(totals.total) || 0;
+        if (chosenMethod.allow_partial_payment && chosenMethod.partial_payment_value > 0) {
+          if (chosenMethod.partial_payment_type === "amount") return Math.min(chosenMethod.partial_payment_value, t);
+          return Math.round(t * chosenMethod.partial_payment_value) / 100;
+        }
+        return t;
+      })(),
       confirmationMessage,
       requiresPayment,
       conversationId,
