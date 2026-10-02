@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, CreditCard, Info, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, CreditCard, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -9,13 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -30,29 +23,17 @@ import {
   deletePaymentMethod,
   listPaymentMethods,
   updatePaymentMethod,
-  type PaymentBehavior,
-  type PaymentDetailType,
   type PaymentMethod,
 } from "@/lib/payment-methods.functions";
-import {
-  paymentPolicySummary,
-  type PartialPaymentType,
-  type PaymentKind,
-} from "@/lib/payment-policy";
+import { paymentPolicySummary, type PaymentKind } from "@/lib/payment-policy";
 
 export const Route = createFileRoute("/settings/payment-methods")({
   head: () => ({
     meta: [
       { title: "طرق الدفع · cupai" },
-      {
-        name: "description",
-        content: "اختر خيارات الدفع التي تقبلها وحدّد سلوك الوكيل الذكي مع كل طريقة.",
-      },
+      { name: "description", content: "اختر طرق الدفع التي تقبلها والمبلغ المطلوب وبيانات الدفع لكل طريقة." },
       { property: "og:title", content: "طرق الدفع · cupai" },
-      {
-        property: "og:description",
-        content: "اختر خيارات الدفع التي تقبلها وحدّد سلوك الوكيل الذكي مع كل طريقة.",
-      },
+      { property: "og:description", content: "اختر طرق الدفع التي تقبلها والمبلغ المطلوب وبيانات الدفع لكل طريقة." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -60,109 +41,53 @@ export const Route = createFileRoute("/settings/payment-methods")({
   component: PaymentMethodsPage,
 });
 
-function BehaviorBadge({ behavior }: { behavior: PaymentBehavior }) {
-  const auto = behavior === "auto";
-  return (
-    <span
-      className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-        auto
-          ? "bg-emerald-500/10 text-emerald-600 ring-1 ring-emerald-500/25"
-          : "bg-orange-500/10 text-orange-600 ring-1 ring-orange-500/25"
-      }`}
-    >
-      {auto ? "تلقائي" : "يدوي"}
-    </span>
-  );
-}
+type AmountMode = "full" | "percent" | "amount";
 
-function behaviorHint(behavior: PaymentBehavior) {
-  return behavior === "auto"
-    ? "يستمر الوكيل في المحادثة بشكل طبيعي."
-    : "يتوقف الوكيل بعد الطلب وينتظر من فريقك تأكيد الدفع.";
-}
-
-const BEHAVIOR_CARDS: Array<{ value: PaymentBehavior; title: string; desc: string }> = [
-  {
-    value: "auto",
-    title: "تلقائي",
-    desc: "يستمر الوكيل في الرد على العميل بشكل طبيعي بعد الطلب.",
-  },
-  {
-    value: "manual",
-    title: "يدوي",
-    desc: "يتوقف الوكيل مباشرة بعد الطلب ويظهر إشعار في لوحة التحكم لتأكيد الدفع بنفسك.",
-  },
+const SUGGESTED: Array<{ name: string; kind: PaymentKind; placeholder: string }> = [
+  { name: "الدفع عند الاستلام", kind: "on_delivery", placeholder: "" },
+  { name: "فودافون كاش", kind: "online", placeholder: "رقم فودافون كاش: 010xxxxxxxx" },
+  { name: "أورنج كاش", kind: "online", placeholder: "رقم أورنج كاش: 012xxxxxxxx" },
+  { name: "اتصالات كاش", kind: "online", placeholder: "رقم اتصالات كاش: 011xxxxxxxx" },
+  { name: "InstaPay", kind: "online", placeholder: "عنوان InstaPay أو رابط الدفع" },
+  { name: "تحويل بنكي", kind: "online", placeholder: "اسم البنك ورقم الحساب / IBAN" },
 ];
 
-const DETAIL_LABELS: Record<PaymentDetailType, string> = {
-  none: "لا يوجد",
-  phone: "رقم الهاتف",
-  url: "الرابط",
-  text: "نص حر",
-};
-
-const DETAIL_PLACEHOLDERS: Record<Exclude<PaymentDetailType, "none">, string> = {
-  phone: "مثال: 010xxxxxxxx",
-  url: "مثال: رابط الدفع الخاص بك",
-  text: "أي تفاصيل يحتاجها العميل لإتمام الدفع، مثل رقم الحساب أو عنوان الدفع أو رابط الدفع",
-};
-
-const NAME_PLACEHOLDER =
-  "مثال: دفع عند الاستلام · Vodafone Cash · Orange Cash · Etisalat Cash · InstaPay";
+const AMOUNT_OPTIONS: Array<{ value: AmountMode; title: string }> = [
+  { value: "full", title: "المبلغ كاملًا" },
+  { value: "percent", title: "نسبة من إجمالي الأوردر" },
+  { value: "amount", title: "مبلغ ثابت" },
+];
 
 interface FormState {
   name: string;
-  behavior: PaymentBehavior;
-  detailType: PaymentDetailType;
-  detailValue: string;
-  instructions: string;
-  paymentTemplate: string;
   paymentKind: PaymentKind;
-  allowFull: boolean;
-  allowPartial: boolean;
-  partialType: PartialPaymentType;
-  partialValue: string;
+  amountMode: AmountMode;
+  amountValue: string;
+  details: string;
 }
 
 const EMPTY_FORM: FormState = {
   name: "",
-  behavior: "auto",
-  detailType: "none",
-  detailValue: "",
-  instructions: "",
-  paymentTemplate: "",
   paymentKind: "online",
-  allowFull: true,
-  allowPartial: false,
-  partialType: "percent",
-  partialValue: "",
+  amountMode: "full",
+  amountValue: "",
+  details: "",
 };
 
-const KIND_CARDS: Array<{ value: PaymentKind; title: string; desc: string }> = [
-  {
-    value: "online",
-    title: "دفع أونلاين",
-    desc: "إنستا باي، المحافظ الإلكترونية، التحويلات. تحدد أدناه هل الدفع كلي أو جزئي.",
-  },
-  {
-    value: "on_delivery",
-    title: "الدفع عند الاستلام",
-    desc: "العميل يدفع عند تسلّم الطلب. لا يُعتبر الطلب مدفوعاً ولا يتحدث الوكيل عنه كأنه مدفوع.",
-  },
-];
+function toAmountMode(m: PaymentMethod): AmountMode {
+  if (m.allow_partial_payment && m.partial_payment_value > 0) {
+    return m.partial_payment_type === "amount" ? "amount" : "percent";
+  }
+  return "full";
+}
 
 function PaymentMethodsPage() {
   const qc = useQueryClient();
-  const q = useQuery({
-    queryKey: ["payment-methods"],
-    queryFn: () => listPaymentMethods(),
-  });
-
+  const q = useQuery({ queryKey: ["payment-methods"], queryFn: () => listPaymentMethods() });
   const invalidate = () => qc.invalidateQueries({ queryKey: ["payment-methods"] });
 
   const update = useMutation({
-    mutationFn: (v: { id: string; enabled?: boolean; behavior?: PaymentBehavior }) =>
-      updatePaymentMethod({ data: v }),
+    mutationFn: (v: { id: string; enabled?: boolean }) => updatePaymentMethod({ data: v }),
     onSuccess: invalidate,
     onError: (e: any) => toast.error(e?.message || "تعذر حفظ التغيير."),
   });
@@ -182,6 +107,10 @@ function PaymentMethodsPage() {
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
 
+  const suggestion = SUGGESTED.find((s) => s.name === form.name.trim());
+  const pickSuggestion = (s: (typeof SUGGESTED)[number]) =>
+    setForm((f) => ({ ...f, name: s.name, paymentKind: s.kind }));
+
   const openCreate = () => {
     setEditingId(null);
     setForm(EMPTY_FORM);
@@ -192,38 +121,42 @@ function PaymentMethodsPage() {
     setEditingId(m.id);
     setForm({
       name: m.name,
-      behavior: m.behavior,
-      detailType: m.detail_type ?? "none",
-      detailValue: m.detail_value ?? "",
-      instructions: m.instructions ?? "",
-      paymentTemplate: m.payment_template ?? "",
       paymentKind: m.payment_kind ?? "online",
-      allowFull: m.allow_full_payment ?? true,
-      allowPartial: Boolean(m.allow_partial_payment),
-      partialType: m.partial_payment_type ?? "percent",
-      partialValue: m.partial_payment_value ? String(m.partial_payment_value) : "",
+      amountMode: toAmountMode(m),
+      amountValue: m.partial_payment_value ? String(m.partial_payment_value) : "",
+      details: m.detail_value ?? "",
     });
     setOpen(true);
   };
 
+  const online = form.paymentKind === "online";
+  const needsValue = online && form.amountMode !== "full";
+  const valueNum = Number(form.amountValue);
+  const valueInvalid =
+    needsValue && (!(valueNum > 0) || (form.amountMode === "percent" && valueNum > 100));
+  const canSave = form.name.trim().length >= 2 && !valueInvalid;
+
   const save = useMutation({
     mutationFn: async () => {
+      const details = online ? form.details.trim() : "";
+      const partial = online && form.amountMode !== "full";
       const payload = {
         name: form.name.trim(),
-        behavior: form.behavior,
-        detail_type: form.detailType,
-        detail_value: form.detailValue.trim(),
-        instructions: form.instructions.trim(),
-        payment_template: form.paymentTemplate.trim(),
+        // Kept for the existing order flow: online methods wait for the merchant.
+        behavior: (online ? "manual" : "auto") as "manual" | "auto",
+        detail_type: (details ? "text" : "none") as "text" | "none",
+        detail_value: details,
+        instructions: "",
+        payment_template: "",
         payment_kind: form.paymentKind,
-        allow_full_payment: form.paymentKind === "on_delivery" ? true : form.allowFull,
-        allow_partial_payment: form.paymentKind === "on_delivery" ? false : form.allowPartial,
-        partial_payment_type: form.partialType,
-        partial_payment_value: Number(form.partialValue) || 0,
+        allow_full_payment: !partial,
+        allow_partial_payment: partial,
+        partial_payment_type: (form.amountMode === "amount" ? "amount" : "percent") as
+          | "amount"
+          | "percent",
+        partial_payment_value: partial ? valueNum || 0 : 0,
       };
-      if (editingId) {
-        return updatePaymentMethod({ data: { id: editingId, ...payload } });
-      }
+      if (editingId) return updatePaymentMethod({ data: { id: editingId, ...payload } });
       return createPaymentMethod({ data: payload });
     },
     onSuccess: () => {
@@ -263,7 +196,7 @@ function PaymentMethodsPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight">طرق الدفع</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              اختر خيارات الدفع التي تقبلها. كل خيار منها يغيّر طريقة تصرف الوكيل مع العملاء.
+              اختر طرق الدفع التي تقبلها. بيانات الدفع تظهر للعميل بعد اختياره الطريقة.
             </p>
           </div>
         </section>
@@ -283,7 +216,9 @@ function PaymentMethodsPage() {
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-2">
                       <span className="truncate text-sm font-semibold">{m.name}</span>
-                      <BehaviorBadge behavior={m.behavior} />
+                      <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
+                        {m.payment_kind === "on_delivery" ? "عند الاستلام" : "إلكتروني"}
+                      </span>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
                       <Switch
@@ -291,13 +226,7 @@ function PaymentMethodsPage() {
                         disabled={update.isPending}
                         onCheckedChange={(v) => update.mutate({ id: m.id, enabled: !!v })}
                       />
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-muted-foreground"
-                        onClick={() => openEdit(m)}
-                        aria-label={`تعديل ${m.name}`}
-                      >
+                      <Button variant="ghost" size="icon" className="text-muted-foreground" onClick={() => openEdit(m)} aria-label={`تعديل ${m.name}`}>
                         <Pencil className="h-4 w-4" />
                       </Button>
                       <Button
@@ -313,14 +242,11 @@ function PaymentMethodsPage() {
                     </div>
                   </div>
                   <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-                    {behaviorHint(m.behavior)}
-                  </p>
-                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                     {paymentPolicySummary(m)}
                   </p>
-                  {m.detail_type !== "none" && m.detail_value ? (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {DETAIL_LABELS[m.detail_type]}: {m.detail_value}
+                  {m.payment_kind !== "on_delivery" && m.detail_value ? (
+                    <p className="mt-1 whitespace-pre-line text-xs text-muted-foreground">
+                      بيانات الدفع: {m.detail_value}
                     </p>
                   ) : null}
                 </li>
@@ -333,59 +259,41 @@ function PaymentMethodsPage() {
           <Plus className="ml-1 h-4 w-4" />
           إضافة طريقة جديدة
         </Button>
-
-        <section className="flex items-start gap-2 rounded-2xl border border-border/60 bg-muted/40 p-4 text-xs leading-relaxed text-muted-foreground">
-          <Info className="mt-0.5 h-4 w-4 shrink-0" />
-          <p>
-            أي طريقة يتم تعيينها كيدوية تعني أن الوكيل سيسلّم المحادثة إليك بعد كل طلب يتم استخدام
-            هذه الطريقة فيه.
-          </p>
-        </section>
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent dir="rtl" className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader className="text-right">
-            <DialogTitle>
-              {editingId ? "تعديل طريقة الدفع" : "إضافة طريقة دفع جديدة"}
-            </DialogTitle>
-            <DialogDescription>
-              حدّد اسم الطريقة وسلوك الوكيل والتفاصيل التي سيرسلها للعميل.
-            </DialogDescription>
+            <DialogTitle>{editingId ? "تعديل طريقة الدفع" : "إضافة طريقة دفع جديدة"}</DialogTitle>
+            <DialogDescription>اختر اسم الطريقة ونوعها والبيانات التي تظهر للعميل.</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="pm-name">اسم الطريقة</Label>
+              <Label htmlFor="pm-name">اسم طريقة الدفع</Label>
               <Input
                 id="pm-name"
                 value={form.name}
-                onChange={(e) => set("name", e.target.value)}
-                placeholder={NAME_PLACEHOLDER}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  const s = SUGGESTED.find((x) => x.name === v.trim());
+                  setForm((f) => ({ ...f, name: v, ...(s ? { paymentKind: s.kind } : {}) }));
+                }}
+                placeholder="اختر اسمًا مقترحًا أو اكتب اسمًا مخصصًا"
               />
-            </div>
-
-            <div className="space-y-2">
-              <Label>نوع السلوك</Label>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {BEHAVIOR_CARDS.map((c) => {
-                  const active = form.behavior === c.value;
+              <div className="flex flex-wrap gap-1.5">
+                {SUGGESTED.map((s) => {
+                  const active = form.name.trim() === s.name;
                   return (
                     <button
-                      key={c.value}
+                      key={s.name}
                       type="button"
-                      onClick={() => set("behavior", c.value)}
-                      aria-pressed={active}
-                      className={`rounded-xl border p-3 text-right transition ${
-                        active
-                          ? "border-primary bg-primary/5 ring-1 ring-primary/30"
-                          : "border-border/60 hover:bg-muted/40"
+                      onClick={() => pickSuggestion(s)}
+                      className={`rounded-full border px-3 py-1 text-xs transition ${
+                        active ? "border-primary bg-primary/10 text-primary" : "border-border/60 hover:bg-muted/40"
                       }`}
                     >
-                      <span className="block text-sm font-semibold">{c.title}</span>
-                      <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
-                        {c.desc}
-                      </span>
+                      {s.name}
                     </button>
                   );
                 })}
@@ -394,8 +302,11 @@ function PaymentMethodsPage() {
 
             <div className="space-y-2">
               <Label>نوع الدفع</Label>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {KIND_CARDS.map((c) => {
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { value: "on_delivery", title: "الدفع عند الاستلام" },
+                  { value: "online", title: "الدفع الإلكتروني" },
+                ] as Array<{ value: PaymentKind; title: string }>).map((c) => {
                   const active = form.paymentKind === c.value;
                   return (
                     <button
@@ -403,166 +314,83 @@ function PaymentMethodsPage() {
                       type="button"
                       onClick={() => set("paymentKind", c.value)}
                       aria-pressed={active}
-                      className={`rounded-xl border p-3 text-right transition ${
-                        active
-                          ? "border-primary bg-primary/5 ring-1 ring-primary/30"
-                          : "border-border/60 hover:bg-muted/40"
+                      className={`rounded-xl border p-3 text-right text-sm font-semibold transition ${
+                        active ? "border-primary bg-primary/5 ring-1 ring-primary/30" : "border-border/60 hover:bg-muted/40"
                       }`}
                     >
-                      <span className="block text-sm font-semibold">{c.title}</span>
-                      <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
-                        {c.desc}
-                      </span>
+                      {c.title}
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {form.paymentKind === "online" && (
-              <div className="space-y-3 rounded-xl border border-border/60 p-3">
-                <Label>سياسة الدفع (يلتزم بها الوكيل حرفياً)</Label>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-sm">السماح بالدفع الكلي</span>
-                  <Switch
-                    checked={form.allowFull}
-                    onCheckedChange={(v) => set("allowFull", !!v)}
-                  />
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-sm">السماح بالدفع الجزئي</span>
-                  <Switch
-                    checked={form.allowPartial}
-                    onCheckedChange={(v) => set("allowPartial", !!v)}
-                  />
-                </div>
-                {form.allowPartial && (
-                  <div className="grid gap-2 sm:grid-cols-2">
+            {online && (
+              <>
+                <div className="space-y-2">
+                  <Label>المبلغ المطلوب</Label>
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    {AMOUNT_OPTIONS.map((o) => {
+                      const active = form.amountMode === o.value;
+                      return (
+                        <button
+                          key={o.value}
+                          type="button"
+                          onClick={() => set("amountMode", o.value)}
+                          aria-pressed={active}
+                          className={`rounded-xl border p-2.5 text-center text-xs font-semibold transition ${
+                            active ? "border-primary bg-primary/5 ring-1 ring-primary/30" : "border-border/60 hover:bg-muted/40"
+                          }`}
+                        >
+                          {o.title}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {needsValue && (
                     <div className="space-y-1">
-                      <Label htmlFor="pm-partial-type" className="text-xs">نوع المبلغ الجزئي</Label>
-                      <Select
-                        value={form.partialType}
-                        onValueChange={(v) => set("partialType", v as PartialPaymentType)}
-                      >
-                        <SelectTrigger id="pm-partial-type" dir="rtl">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent dir="rtl">
-                          <SelectItem value="percent">نسبة مئوية من الإجمالي</SelectItem>
-                          <SelectItem value="amount">مبلغ ثابت</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="pm-partial-value" className="text-xs">
-                        {form.partialType === "percent" ? "النسبة المطلوبة (%)" : "المبلغ المطلوب"}
+                      <Label htmlFor="pm-amount" className="text-xs">
+                        {form.amountMode === "percent" ? "النسبة (%)" : "المبلغ"}
                       </Label>
                       <Input
-                        id="pm-partial-value"
+                        id="pm-amount"
                         type="number"
                         inputMode="decimal"
                         min={0}
-                        max={form.partialType === "percent" ? 100 : undefined}
-                        value={form.partialValue}
-                        onChange={(e) => set("partialValue", e.target.value)}
-                        placeholder={form.partialType === "percent" ? "مثال: 50" : "مثال: 200"}
+                        max={form.amountMode === "percent" ? 100 : undefined}
+                        value={form.amountValue}
+                        onChange={(e) => set("amountValue", e.target.value)}
+                        placeholder={form.amountMode === "percent" ? "مثال: 50" : "مثال: 200"}
                       />
+                      {valueInvalid && (
+                        <p className="text-xs text-destructive">
+                          {form.amountMode === "percent" ? "أدخل نسبة بين 1 و 100." : "أدخل مبلغًا صحيحًا."}
+                        </p>
+                      )}
                     </div>
-                  </div>
-                )}
-                {!form.allowFull && !form.allowPartial && (
-                  <p className="text-xs text-destructive">اختر خياراً واحداً على الأقل.</p>
-                )}
-                {form.allowPartial && !(Number(form.partialValue) > 0) && (
-                  <p className="text-xs text-destructive">حدّد قيمة الدفع الجزئي.</p>
-                )}
-              </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="pm-details">بيانات الدفع</Label>
+                  <Textarea
+                    id="pm-details"
+                    rows={3}
+                    maxLength={500}
+                    value={form.details}
+                    onChange={(e) => set("details", e.target.value)}
+                    placeholder={suggestion?.placeholder || "مثال: رقم فودافون كاش: 01204664848 أو رابط الدفع"}
+                  />
+                  <p className="text-xs text-muted-foreground">تظهر للعميل بعد اختياره هذه الطريقة لإكمال الدفع.</p>
+                </div>
+              </>
             )}
-
-            <div className="space-y-2">
-              <Label>نوع التفاصيل</Label>
-              <Select
-                value={form.detailType}
-                onValueChange={(v) => {
-                  set("detailType", v as PaymentDetailType);
-                  if (v === "none") set("detailValue", "");
-                }}
-              >
-                <SelectTrigger dir="rtl">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent dir="rtl">
-                  {(Object.keys(DETAIL_LABELS) as PaymentDetailType[]).map((k) => (
-                    <SelectItem key={k} value={k}>
-                      {DETAIL_LABELS[k]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="pm-instructions">تعليمات خاصة بطريقة الدفع</Label>
-              <Textarea
-                id="pm-instructions"
-                rows={4}
-                value={form.instructions}
-                onChange={(e) => set("instructions", e.target.value)}
-                placeholder="مثال: اشرح للعميل طريقة الدفع وخطوات إتمامها..."
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="pm-template">نموذج رسالة الدفع</Label>
-              <Textarea
-                id="pm-template"
-                rows={4}
-                value={form.paymentTemplate}
-                onChange={(e) => set("paymentTemplate", e.target.value)}
-                placeholder={
-                  form.behavior === "manual"
-                    ? "تمام، تم تأكيد الاوردر يا فندم. [تفاصيل الدفع]. من فضلك أبعت لينا لقطة شاشة للتحويل عشان يتم تأكيد الدفع."
-                    : "تم تأكيد الاوردر يا فندم. وهيوصل لحضرتك في خلال [مدة التوصيل]."
-                }
-              />
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                الرسالة التي يرسلها الوكيل للعميل عند اختيار هذه الطريقة. اتركها فارغة لاستخدام
-                الصياغة الافتراضية. يمكنك استخدام: [تفاصيل الدفع] · [مدة التوصيل] · [رقم الطلب].
-              </p>
-            </div>
-
-            {form.detailType !== "none" && (
-              <div className="space-y-2">
-                <Label htmlFor="pm-detail">{DETAIL_LABELS[form.detailType]}</Label>
-                <Input
-                  id="pm-detail"
-                  type={form.detailType === "phone" ? "tel" : form.detailType === "url" ? "url" : "text"}
-                  inputMode={form.detailType === "phone" ? "tel" : undefined}
-                  value={form.detailValue}
-                  onChange={(e) => set("detailValue", e.target.value)}
-                  placeholder={DETAIL_PLACEHOLDERS[form.detailType]}
-                />
-              </div>
-            )}
-
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              هذه هي بالضبط المعلومات التي سيرسلها الوكيل إلى العميل عندما تختار هذه الطريقة.
-            </p>
           </div>
 
           <DialogFooter className="gap-2 sm:justify-start">
-            <Button
-              onClick={() => save.mutate()}
-              disabled={
-                save.isPending ||
-                form.name.trim().length < 2 ||
-                (form.paymentKind === "online" &&
-                  ((!form.allowFull && !form.allowPartial) ||
-                    (form.allowPartial && !(Number(form.partialValue) > 0))))
-              }
-            >
+            <Button onClick={() => save.mutate()} disabled={!canSave || save.isPending}>
               {save.isPending && <Loader2 className="ml-1 h-4 w-4 animate-spin" />}
-              حفظ
+              {editingId ? "حفظ" : "إضافة"}
             </Button>
             <Button variant="ghost" onClick={() => setOpen(false)}>
               إلغاء
