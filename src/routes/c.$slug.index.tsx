@@ -976,9 +976,9 @@ function CartDrawer({
                       </li>
                     ))}
                   </ul>
-                  <div className="flex justify-between border-t pt-1"><span className="text-muted-foreground">السعر قبل الخصم</span><span>{receipt.subtotal.toFixed(2)} {receipt.currency ?? ""}</span></div>
                   {receipt.discount > 0 && (
                     <>
+                      <div className="flex justify-between border-t pt-1"><span className="text-muted-foreground">السعر قبل الخصم</span><span>{receipt.subtotal.toFixed(2)} {receipt.currency ?? ""}</span></div>
                       <div className="flex justify-between text-primary">
                         <span>قيمة الخصم</span><span>-{receipt.discount.toFixed(2)} {receipt.currency ?? ""}</span>
                       </div>
@@ -1095,19 +1095,19 @@ function CartDrawer({
                   </li>
                 ))}
               </ul>
-              <div className="space-y-1">
-                <div className="flex justify-between"><span className="text-muted-foreground">السعر قبل الخصم</span><span>{subtotal.toFixed(2)} {currency ?? ""}</span></div>
-                {discount > 0 && (
-                  <>
-                    <div className="flex justify-between text-primary">
-                      <span>قيمة الخصم</span><span>-{discount.toFixed(2)} {currency ?? ""}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">السعر بعد الخصم</span>
-                      <span>{(subtotal - discount).toFixed(2)} {currency ?? ""}</span>
-                    </div>
-                  </>
-                )}
+                <div className="space-y-1">
+                  {discount > 0 && (
+                    <>
+                      <div className="flex justify-between"><span className="text-muted-foreground">السعر قبل الخصم</span><span>{subtotal.toFixed(2)} {currency ?? ""}</span></div>
+                      <div className="flex justify-between text-primary">
+                        <span>قيمة الخصم</span><span>-{discount.toFixed(2)} {currency ?? ""}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">السعر بعد الخصم</span>
+                        <span>{(subtotal - discount).toFixed(2)} {currency ?? ""}</span>
+                      </div>
+                    </>
+                  )}
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">الشحن {shippingRow ? `(${[shippingRow.country, shippingRow.region].filter(Boolean).join(" / ")})` : ""}</span>
                   <span>{shippingPrice.toFixed(2)} {currency ?? ""}</span>
