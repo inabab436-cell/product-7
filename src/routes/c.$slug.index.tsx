@@ -771,8 +771,6 @@ function CartDrawer({
   const discount = quote?.discount ?? 0;
   const appliedOffers = quote?.offers ?? [];
   const total = quote?.total ?? subtotal + shippingPrice;
-  const chosenMethod = store.paymentMethods.find((m) => m.name === paymentName) ?? null;
-  const manualChosen = chosenMethod?.behavior === "manual";
 
   const mut = useMutation({
     mutationFn: async () => {
@@ -893,26 +891,43 @@ function CartDrawer({
     <div className="store fixed inset-0 z-50 flex" onClick={onClose} dir="rtl">
       <div className="flex-1 bg-foreground/50 backdrop-blur-[2px]" />
       <div className="flex h-full w-full max-w-md flex-col bg-background shadow-2xl animate-in slide-in-from-left duration-300" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b p-4">
-          <h3 className="store-display text-3xl">
-            {step === "cart" && "سلة الشراء"}
-            {step === "shipping" && "منطقة الشحن"}
-            {step === "payment" && "طريقة الدفع"}
-            {step === "summary" && "ملخص الأوردر"}
-            {step === "done" && (receipt?.requiresPayment ? "بانتظار إتمام الدفع" : "تم تأكيد الأوردر")}
-          </h3>
-          <button onClick={onClose} className="rounded p-1 hover:bg-muted"><X className="h-4 w-4" /></button>
+        <div className="border-b p-4">
+          <div className="flex items-center justify-between">
+            <h3 className="store-display text-xl">
+              {step === "cart" && "سلة الشراء"}
+              {step === "shipping" && "منطقة الشحن"}
+              {step === "payment" && "طريقة الدفع"}
+              {step === "summary" && "ملخص الأوردر"}
+              {step === "done" && (receipt?.requiresPayment ? "بانتظار إتمام الدفع" : "تم تأكيد الأوردر")}
+            </h3>
+            <button onClick={onClose} className="rounded p-1 hover:bg-muted"><X className="h-4 w-4" /></button>
+          </div>
+          {step !== "done" && (
+            <div className="mt-3 flex items-center">
+              {(["cart", "shipping", "payment", "summary"] as const).map((s, i) => (
+                <div key={s} className={`flex items-center ${i < 3 ? "flex-1" : ""}`}>
+                  <div className="flex flex-col items-center gap-1">
+                    <div className={`h-1.5 w-1.5 rounded-full ${i <= ["cart", "shipping", "payment", "summary"].indexOf(step) ? "bg-primary" : "bg-border"}`} />
+                    <span className={`text-[10px] ${i <= ["cart", "shipping", "payment", "summary"].indexOf(step) ? "text-foreground" : "text-muted-foreground"}`}>
+                      {s === "cart" ? "السلة" : s === "shipping" ? "الشحن" : s === "payment" ? "الدفع" : "الملخص"}
+                    </span>
+                  </div>
+                  {i < 3 && <div className="mb-3 h-px flex-1 bg-border" />}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto p-4">
           {step === "done" && receipt && (
             <div className="space-y-3 text-sm">
-              <div className="bg-primary p-5 text-primary-foreground">
-                <div className="store-display text-3xl">
+              <div className="bg-primary p-4 text-primary-foreground">
+                <div className="store-display text-xl">
                   {receipt.requiresPayment ? "تم تسجيل الأوردر — فاضل إتمام الدفع" : "تم إنشاء الأوردر بنجاح ✅"}
                 </div>
-                <div className="mt-1">رقم الأوردر: <span className="font-mono">{receipt.orderNumber}</span></div>
-                <div className="mt-1">الإجمالي: {receipt.total} {receipt.currency ?? ""}</div>
+                <div className="mt-1 text-sm">رقم الأوردر: <span className="font-mono">{receipt.orderNumber}</span></div>
+                <div className="mt-1 text-sm">الإجمالي: {receipt.total} {receipt.currency ?? ""}</div>
               </div>
 
               {receipt.requiresPayment ? (
@@ -1007,12 +1022,12 @@ function CartDrawer({
 
           {step === "cart" && (
             cart.lines.length === 0 ? (
-              <div className="py-16 text-center"><ShoppingBag className="mx-auto h-10 w-10" strokeWidth={1} /><p className="store-display mt-4 text-3xl">سلتك فارغة</p><p className="mt-1 text-sm text-muted-foreground">أضف قطعك المفضلة لتظهر هنا.</p></div>
+              <div className="py-16 text-center"><ShoppingBag className="mx-auto h-10 w-10" strokeWidth={1} /><p className="store-display mt-4 text-xl">سلتك فارغة</p><p className="mt-1 text-sm text-muted-foreground">لم تُضِف أي منتجات بعد.</p></div>
             ) : (
               <ul className="space-y-3">
                 {cart.lines.map((l) => (
-                  <li key={`${l.productId}-${l.color ?? ""}-${l.size ?? ""}`} className="flex items-center gap-3 border-b border-border pb-3">
-                    {l.image ? <img src={l.image} alt="" className="h-24 w-[72px] shrink-0 bg-secondary object-cover" /> : <div className="h-24 w-[72px] shrink-0 bg-secondary" />}
+                  <li key={`${l.productId}-${l.color ?? ""}-${l.size ?? ""}`} className="flex items-center gap-3 border p-3">
+                    {l.image ? <img src={l.image} alt="" className="h-20 w-16 shrink-0 bg-secondary object-cover" /> : <div className="h-20 w-16 shrink-0 bg-secondary" />}
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-medium">{l.name}</div>
                       {(l.color || l.size) && (
@@ -1044,7 +1059,7 @@ function CartDrawer({
                 <ul className="space-y-2">
                   {store.shipping.map((s) => (
                     <li key={s.id}>
-                      <label className={`flex cursor-pointer items-start gap-2 border p-4 transition ${shippingId === s.id ? "border-primary bg-secondary" : "border-border hover:border-primary"}`}>
+                      <label className={`flex cursor-pointer items-start gap-3 border p-3 transition ${shippingId === s.id ? "border-primary bg-secondary" : "border-border hover:border-foreground/40"}`}>
                         <input type="radio" name="shipping" checked={shippingId === s.id} onChange={() => setShippingId(s.id)} className="mt-1" />
                         <span className="flex-1">
                           <span className="font-medium">{[s.country, s.region].filter(Boolean).join(" / ") || "الشحن"}</span>
@@ -1069,7 +1084,7 @@ function CartDrawer({
                 <ul className="space-y-2">
                   {store.paymentMethods.map((m) => (
                     <li key={m.id}>
-                      <label className={`flex cursor-pointer items-center gap-2 border p-4 transition ${paymentName === m.name ? "border-primary bg-secondary" : "border-border hover:border-primary"}`}>
+                      <label className={`flex cursor-pointer items-center gap-3 border p-3 transition ${paymentName === m.name ? "border-primary bg-secondary" : "border-border hover:border-foreground/40"}`}>
                         <input type="radio" name="payment" checked={paymentName === m.name} onChange={() => setPaymentName(m.name)} />
                         <span className="font-medium">{m.name}</span>
                       </label>
@@ -1095,11 +1110,11 @@ function CartDrawer({
                   </li>
                 ))}
               </ul>
-                <div className="space-y-1">
+                <div className="space-y-1 border p-3">
                   {discount > 0 && (
                     <>
                       <div className="flex justify-between"><span className="text-muted-foreground">السعر قبل الخصم</span><span>{subtotal.toFixed(2)} {currency ?? ""}</span></div>
-                      <div className="flex justify-between text-primary">
+                      <div className="flex justify-between">
                         <span>قيمة الخصم</span><span>-{discount.toFixed(2)} {currency ?? ""}</span>
                       </div>
                       <div className="flex justify-between">
@@ -1108,23 +1123,17 @@ function CartDrawer({
                       </div>
                     </>
                   )}
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">الشحن {shippingRow ? `(${[shippingRow.country, shippingRow.region].filter(Boolean).join(" / ")})` : ""}</span>
-                  <span>{shippingPrice.toFixed(2)} {currency ?? ""}</span>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">الشحن {shippingRow ? `(${[shippingRow.country, shippingRow.region].filter(Boolean).join(" / ")})` : ""}</span>
+                    <span>{shippingPrice.toFixed(2)} {currency ?? ""}</span>
+                  </div>
+                  <div className="flex justify-between border-t pt-2 font-semibold">
+                    <span>الإجمالي النهائي</span><span>{total.toFixed(2)} {currency ?? ""}</span>
+                  </div>
+                  {paymentName && (
+                    <div className="flex justify-between pt-1"><span className="text-muted-foreground">طريقة الدفع</span><span>{paymentName}</span></div>
+                  )}
                 </div>
-                <div className="flex justify-between border-t pt-1 text-base font-semibold">
-                  <span>الإجمالي النهائي</span><span>{total.toFixed(2)} {currency ?? ""}</span>
-                </div>
-                {paymentName && (
-                  <div className="flex justify-between pt-1"><span className="text-muted-foreground">طريقة الدفع</span><span>{paymentName}</span></div>
-                )}
-                {manualChosen && (
-                  <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
-                    طريقة دفع يدوية: بعد تسجيل الأوردر هيتم تحويلك لإتمام الدفع، ولن يُعتبر الأوردر مدفوعاً قبل تأكيد الدفع.
-                  </p>
-
-                )}
-              </div>
 
               <AppliedOffers offers={appliedOffers} currency={currency} />
 
@@ -1171,10 +1180,10 @@ function CartDrawer({
         </div>
 
         {step !== "done" && cart.lines.length > 0 && (
-          <div className="space-y-3 border-t p-4">
+          <div className="space-y-2 border-t p-4">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">الإجمالي</span>
-              <span className="store-display text-3xl">{total.toFixed(2)} {currency ?? ""}</span>
+              <span className="text-xs text-muted-foreground">الإجمالي</span>
+              <span className="font-semibold">{total.toFixed(2)} {currency ?? ""}</span>
             </div>
             <div className="flex gap-2">
               {step !== "cart" && (
